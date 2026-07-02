@@ -149,11 +149,12 @@ await page.click('.nav-tab[data-action="nav"][data-id="schedule"]');
 await page.evaluate(() => {
   const st = JSON.parse(localStorage.getItem('kessan-board-state-v1'));
   st.settings.scheduleApiBase = 'https://webapi.example.test/tdnet';
+  st.settings.helperBase = '';  // ヘルパー無効 → TDnet直接fetchへのフォールバックを検証
   localStorage.setItem('kessan-board-state-v1', JSON.stringify(st));
 });
 await page.reload();
 await page.click('.nav-tab[data-id="schedule"]');
-await page.click('[data-action="tdnet-update"]');
+await page.click('[data-action="schedule-update"]');
 await page.waitForFunction(() => document.querySelectorAll('.schedule-table tbody tr[data-schedule-id]').length >= 2);
 assert(dialogs.some((d) => d.includes('TDnet更新完了')), 'TDnet update completes');
 const schedText = await page.locator('.schedule-table').textContent();
