@@ -34,16 +34,18 @@ function yoy(cur, prev) {
 }
 
 // record から累計値をフラットに取り出す
-const CUM_FIELDS = ["sales", "operatingIncome", "ordinaryIncome", "netIncome", "operatingCF"];
+const CUM_FIELDS = ["sales", "operatingIncome", "ordinaryIncome", "netIncome", "operatingCF", "investingCF", "financingCF"];
 
 function cumOf(r) {
   if (!r) return {};
   return {
-    sales: n(r.pl.sales),
-    operatingIncome: n(r.pl.operatingIncome),
-    ordinaryIncome: n(r.pl.ordinaryIncome),
-    netIncome: n(r.pl.netIncome),
-    operatingCF: n(r.cf.operatingCF),
+    sales: n(r.pl?.sales),
+    operatingIncome: n(r.pl?.operatingIncome),
+    ordinaryIncome: n(r.pl?.ordinaryIncome),
+    netIncome: n(r.pl?.netIncome),
+    operatingCF: n(r.cf?.operatingCF),
+    investingCF: n(r.cf?.investingCF),
+    financingCF: n(r.cf?.financingCF),
   };
 }
 
@@ -86,6 +88,10 @@ export function deriveCompany(company, allRecords) {
     const sq = sqAt(fy, q);
     const prevYearCum = cumAt(fy - 1, q);
     const prevYearSq = sqAt(fy - 1, q);
+    const prevQSq = q === 1 ? sqAt(fy - 1, 4) : sqAt(fy, q - 1);
+
+    // QoQ(前四半期比): 単Qどうしのみ(累計比較は意味を持たない)
+    const qoqOf = (field) => yoy(sq[field], prevQSq[field]);
 
     // YoY: 単Qどうしで算出。単Qが揃わない期は累計どうしにフォールバック(basis で区別)
     const yoyOf = (field) => {
@@ -109,6 +115,7 @@ export function deriveCompany(company, allRecords) {
       ttm: {
         netIncome: ttmAt(fy, q, "netIncome"),
         operatingCF: ttmAt(fy, q, "operatingCF"),
+        investingCF: ttmAt(fy, q, "investingCF"),
         sales: ttmAt(fy, q, "sales"),
       },
       yoy: {
@@ -116,16 +123,54 @@ export function deriveCompany(company, allRecords) {
         operatingIncome: yoyOf("operatingIncome"),
         netIncome: yoyOf("netIncome"),
       },
+      qoq: {
+        sales: qoqOf("sales"),
+        operatingIncome: qoqOf("operatingIncome"),
+        netIncome: qoqOf("netIncome"),
+      },
       bs: {
         totalAssets: n(r.bs.totalAssets),
+        netAssets: n(r.bs.netAssets),
         equity: n(r.bs.equity),
         interestBearingDebt: n(r.bs.interestBearingDebt),
+        cash: n(r.bs.cash),
+        inventory: n(r.bs.inventory),
+        receivables: n(r.bs.receivables),
+        payables: n(r.bs.payables),
       },
+      cfStock: { cashEnd: n(r.cf?.cashEnd) },
       shares: n(r.shares.outstanding),
       forecast: r.forecast,
+      dividend: r.dividend || {},
+      segments: Array.isArray(r.segments) ? r.segments : [],
+      prevYearSegments: byKey.get(periodKey(fy - 1, q))?.segments || [],
       company,
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+// バリュエーション(仕様9章)。price: 円、金額系: 百万円、株式数: 株
+// ---------------------------------------------------------------------------
+
+export function valuation(ctx, price) {
+  price = n(price);
+  if (!ctx || price === null) return null;
+  const shares = ctx.shares;
+  const toYen = (mm) => (mm === null ? null : mm * 1e6); // 百万円/株 → 円/株
+  const epsTTMYen = toYen(ratio(ctx.ttm.netIncome, shares));
+  const epsForecast = n(ctx.forecast?.eps) ?? toYen(ratio(n(ctx.forecast?.netIncome), shares));
+  const bpsYen = toYen(ratio(ctx.bs.equity, shares));
+  return {
+    perActual: epsTTMYen ? price / epsTTMYen : null,
+    perForecast: epsForecast ? price / epsForecast : null,
+    pbr: bpsYen ? price / bpsYen : null,
+    dividendYield: ratio(n(ctx.dividend?.annualForecast), price),
+    marketCap: shares !== null ? (price * shares) / 1e6 : null, // 百万円
+    epsTTM: epsTTMYen,
+    epsForecast,
+    bps: bpsYen,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -283,6 +328,91 @@ export const METRICS = [
     group: "soundness",
     format: "x2",
     compute: (c) => ratio(c.ttm.operatingCF, c.ttm.netIncome),
+  },
+  {
+    id: "epsActual",
+    label: "EPS(実績)",
+    group: "profitability",
+    format: "yen",
+    compute: (c) => {
+      const v = c.record.pl?.eps;
+      if (typeof v === "number") return v;
+      const eps = ratio(c.ttm.netIncome, c.shares);
+      return eps === null ? null : eps * 1e6;
+    },
+  },
+  {
+    id: "investingCFQ",
+    label: "投資CF(単Q)",
+    group: "soundness",
+    format: "mm",
+    compute: (c) => c.sq.investingCF ?? c.cum.investingCF,
+  },
+  {
+    id: "financingCFQ",
+    label: "財務CF(単Q)",
+    group: "soundness",
+    format: "mm",
+    compute: (c) => c.sq.financingCF ?? c.cum.financingCF,
+  },
+  {
+    id: "operatingCFQ",
+    label: "営業CF(単Q)",
+    group: "soundness",
+    format: "mm",
+    compute: (c) => c.sq.operatingCF ?? c.cum.operatingCF,
+  },
+  {
+    id: "fcfQ",
+    label: "フリーCF(単Q)",
+    group: "soundness",
+    format: "mm",
+    compute: (c) => {
+      const o = c.sq.operatingCF ?? c.cum.operatingCF;
+      const i = c.sq.investingCF ?? c.cum.investingCF;
+      return o === null || i === null ? null : o + i;
+    },
+  },
+  {
+    id: "fcfTTM",
+    label: "フリーCF(TTM)",
+    group: "soundness",
+    format: "mm",
+    compute: (c) =>
+      c.ttm.operatingCF === null || c.ttm.investingCF === null
+        ? null
+        : c.ttm.operatingCF + c.ttm.investingCF,
+  },
+  {
+    id: "qoqSales",
+    label: "売上QoQ",
+    group: "growth",
+    format: "percent1signed",
+    heat: true,
+    compute: (c) => c.qoq.sales,
+  },
+  {
+    id: "qoqOpIncome",
+    label: "営利QoQ",
+    group: "growth",
+    format: "percent1signed",
+    heat: true,
+    compute: (c) => c.qoq.operatingIncome,
+  },
+  {
+    id: "qoqNetIncome",
+    label: "純利QoQ",
+    group: "growth",
+    format: "percent1signed",
+    heat: true,
+    compute: (c) => c.qoq.netIncome,
+  },
+  {
+    id: "cashAndDebt",
+    label: "現金",
+    group: "soundness",
+    format: "mm",
+    compute: (c) => c.bs.cash ?? c.cfStock.cashEnd,
   },
   {
     id: "progressNI",
