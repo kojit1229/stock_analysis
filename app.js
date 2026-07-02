@@ -32,6 +32,7 @@ function defaultState() {
       theme: "dark",
       defaultPeriods: 8,
       scheduleApiBase: "https://webapi.yanoshin.jp/webapi/tdnet",
+      helperBase: "http://localhost:8787",
     },
     companies: [],
     records: [],
@@ -68,9 +69,10 @@ function migrateRecord(r) {
 function migrate(raw) {
   if (raw.version === 1) {
     raw.version = 2;
-    raw.settings.scheduleApiBase ??= defaultState().settings.scheduleApiBase;
     raw.schedule = raw.schedule || [];
   }
+  raw.settings.scheduleApiBase ??= defaultState().settings.scheduleApiBase;
+  raw.settings.helperBase ??= defaultState().settings.helperBase;
   raw.records = (raw.records || []).map(migrateRecord);
   raw.schedule = raw.schedule || [];
   return raw;
@@ -454,6 +456,7 @@ function renderDetail() {
     </div>
     <label class="pdf-attach-btn">短信PDF<input type="file" id="attach-tanshin" accept="application/pdf" hidden></label>
     <label class="pdf-attach-btn">説明資料PDF<input type="file" id="attach-setsumei" accept="application/pdf" hidden></label>
+    <button data-action="kabutan-company" data-id="${company.id}" title="株探の開示一覧からPDFを取得">株探PDF</button>
     <button class="primary" data-action="input-record" data-id="${company.id}">＋当期入力</button>
     <button data-action="edit-company" data-id="${company.id}" title="銘柄情報を編集">✎</button>
   `;
@@ -886,7 +889,8 @@ async function importPdfFile(file, { docTypeHint, source, companyId, scheduleRow
     parsed = { meta: { docType: docTypeHint || "unknown" }, fields: {}, segments: [] };
   }
   const meta = parsed.meta;
-  const docType = meta.docType === "unknown" ? (docTypeHint || "setsumei") : meta.docType;
+  // ユーザーが明示した種別(短信/説明資料ボタン)を優先し、無指定時はPDFから自動判定
+  const docType = docTypeHint || (meta.docType === "unknown" ? "setsumei" : meta.docType);
 
   // 銘柄の解決(添付先指定 > コード一致 > 自動登録)
   let company = companyId ? companyById(companyId) : null;
@@ -989,7 +993,7 @@ function openUploadAny() {
   input.type = "file";
   input.accept = "application/pdf";
   input.onchange = () => {
-    if (input.files[0]) importPdfFile(input.files[0], { docTypeHint: "tanshin", source: "manual" });
+    if (input.files[0]) importPdfFile(input.files[0], { source: "manual" });
   };
   input.click();
 }
@@ -1481,6 +1485,7 @@ function scheduleRowHtml(row, { withCheckbox = true } = {}) {
     <td>${recordCommented(rec) ? "💬" : '<span class="dim">未</span>'}</td>
     <td class="cell-actions">
       ${canFetch ? `<button data-action="fetch-pdf" data-id="${esc(row.id)}" ${row.tanshinStatus === "fetching" ? "disabled" : ""}>${row.tanshinStatus === "failed" ? "再取得" : "取得"}</button>` : ""}
+      ${announced ? `<button data-action="kabutan-pdf" data-id="${esc(row.id)}">株探</button>` : ""}
       ${row.tanshinUrl ? `<a href="${esc(row.tanshinUrl)}" target="_blank" rel="noopener" class="open-link">開く</a>` : ""}
       ${rec ? `<button data-action="open-schedule-analysis" data-id="${esc(row.id)}">分析</button>` : ""}
     </td>
@@ -1496,7 +1501,7 @@ function renderSchedule() {
       <button data-period="past" class="${ui.schedulePeriod === "past" ? "active" : ""}">過去1週間</button>
       <button data-period="future" class="${ui.schedulePeriod === "future" ? "active" : ""}">未来1ヶ月</button>
     </div>
-    <button data-action="tdnet-update">TDnetから更新</button>
+    <button class="primary" data-action="schedule-update">スケジュール更新</button>
     <button data-action="schedule-import">CSVインポート</button>
     <button data-action="schedule-add">＋手動追加</button>
     <button data-action="settings" title="設定">⚙</button>
@@ -1582,8 +1587,140 @@ function renderChecked() {
         </tbody>
       </table>
     </div>
-    <p class="toolbar-note">※PDFの直接取得は配信元のCORS設定により失敗する場合があります。その場合は「開く」でPDFを開き、ダウンロードして銘柄詳細画面から添付してください。</p>`;
+    <p class="toolbar-note">※PDFの直接取得が失敗する場合はローカルヘルパー(<code>python3 tools/kessan_helper.py</code>)を起動してください。自動でヘルパー経由の取得に切り替わります。ヘルパーなしの場合は「開く」または「株探」からPDFを入手し、銘柄詳細画面から添付できます。</p>`;
   bindScheduleChecks();
+}
+
+// ---- ローカルヘルパー(tools/kessan_helper.py) ----
+
+function helperBase() {
+  return (state.settings.helperBase || "").replace(/\/$/, "");
+}
+
+async function helperJson(path) {
+  const base = helperBase();
+  if (!base) throw new Error("ヘルパー未設定");
+  const res = await fetch(`${base}${path}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// スケジュール行のマージ(helper/TDnet/CSV共通)。dataは正規化済み行
+function mergeScheduleRow(data) {
+  const id = `s_${data.code}_${data.date}`;
+  let row = scheduleRowById(id);
+  if (!row) {
+    row = {
+      id, code: data.code, name: data.name || data.code, date: data.date,
+      sector: data.sector || "", market: data.market || "",
+      marketCap: data.marketCap ?? null,
+      fiscalYear: data.fiscalYear ?? null, quarter: data.quarter ?? null,
+      announced: !!data.announced, checked: false,
+      tanshinUrl: data.tanshinUrl || null, setsumeiUrl: data.setsumeiUrl || null,
+      tanshinStatus: "none", setsumeiStatus: "none",
+      source: data.source || "helper",
+    };
+    state.schedule.push(row);
+    return { row, added: true };
+  }
+  row.announced = row.announced || !!data.announced;
+  row.name = data.name || row.name;
+  row.market = data.market || row.market;
+  row.sector = data.sector || row.sector;
+  row.marketCap = data.marketCap ?? row.marketCap;
+  row.fiscalYear ??= data.fiscalYear ?? null;
+  row.quarter ??= data.quarter ?? null;
+  if (data.tanshinUrl) row.tanshinUrl = data.tanshinUrl;
+  if (data.setsumeiUrl) row.setsumeiUrl = data.setsumeiUrl;
+  return { row, added: false };
+}
+
+// スケジュール更新: ヘルパー優先(過去=TDnet+未来=JPX)、不可ならTDnet APIを直接fetch
+async function scheduleUpdate() {
+  try {
+    const data = await helperJson("/schedule?days_past=7");
+    let added = 0;
+    for (const r of [...(data.past || []), ...(data.future || [])]) {
+      if (mergeScheduleRow(r).added) added++;
+    }
+    saveState();
+    render();
+    const errNote = data.errors?.length ? `\n一部失敗: ${data.errors.join(" / ")}` : "";
+    alert(`ヘルパー経由で更新しました: 追加 ${added}件 / 合計 ${state.schedule.length}件${errNote}`);
+  } catch (err) {
+    const direct = confirm(
+      `ローカルヘルパー(${helperBase() || "未設定"})に接続できません: ${err.message}\n\n` +
+      "ヘルパーを使うと株探・TDnet・JPXから取得できます:\n  python3 tools/kessan_helper.py\n\n" +
+      "OK: TDnet APIへの直接アクセスを試す / キャンセル: 中止"
+    );
+    if (direct) await tdnetUpdate();
+  }
+}
+
+// 株探からPDFを選んで取込
+async function openKabutanModal(code, { companyId = null, scheduleRow = null } = {}) {
+  openModal(`
+    <h2>株探からPDF取得 — ${esc(code)}</h2>
+    <div id="kabutan-list"><p class="dim">株探の開示ページを検索中…</p></div>
+    <div class="modal-actions">
+      <span class="toolbar-note">ローカルヘルパー経由で kabutan.jp の開示一覧からPDFリンクを取得します</span>
+      <span class="spacer"></span>
+      <button data-action="close-modal">閉じる</button>
+    </div>
+  `, true);
+  const box = document.getElementById("kabutan-list");
+  let data;
+  try {
+    data = await helperJson(`/kabutan?code=${encodeURIComponent(code)}`);
+  } catch (err) {
+    box.innerHTML = `<p class="dim">取得できませんでした: ${esc(err.message)}<br>
+      ローカルヘルパーが起動しているか確認してください: <code>python3 tools/kessan_helper.py</code></p>`;
+    return;
+  }
+  const pdfs = data.pdfs || [];
+  if (!pdfs.length) {
+    box.innerHTML = `<p class="dim">PDFリンクが見つかりませんでした。株探のページ構成が変わった可能性があります(tools/kessan_helper.py の KABUTAN_URL / 正規表現を調整してください)。</p>`;
+    return;
+  }
+  box.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>日付</th><th>タイトル</th><th></th></tr></thead>
+    <tbody>
+      ${pdfs.map((p, i) => `<tr>
+        <td>${esc(p.date || "—")}</td>
+        <td class="cell-left">${esc(p.title)}</td>
+        <td class="cell-actions">
+          <button data-kabutan-idx="${i}" data-kind="tanshin">短信として取込</button>
+          <button data-kabutan-idx="${i}" data-kind="setsumei">説明資料として取込</button>
+        </td>
+      </tr>`).join("")}
+    </tbody>
+  </table></div>`;
+  box.addEventListener("click", async (e) => {
+    const b = e.target.closest("button[data-kabutan-idx]");
+    if (!b) return;
+    const pdf = pdfs[Number(b.dataset.kabutanIdx)];
+    b.disabled = true;
+    b.textContent = "取得中…";
+    try {
+      const res = await fetch(`${helperBase()}/pdf?url=${encodeURIComponent(pdf.url)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const file = new File([blob], pdf.url.split("/").pop() || `${code}.pdf`, { type: "application/pdf" });
+      closeModal();
+      // 銘柄詳細から開いた場合は表示中の期を既定とする(PDF側の判定が優先)
+      let fy = null, q = null;
+      const company = companyId ? companyById(companyId) : null;
+      if (company) {
+        const ctx = detailCtx(derivedFor(company));
+        if (ctx) { fy = ctx.fy; q = ctx.q; }
+      }
+      await importPdfFile(file, { docTypeHint: b.dataset.kind, source: "kabutan", companyId, scheduleRow, fy, q });
+    } catch (err) {
+      b.disabled = false;
+      b.textContent = "再試行";
+      alert(`PDF取得に失敗しました: ${err.message}`);
+    }
+  });
 }
 
 // ---- TDnet API取得 ----
@@ -1614,36 +1751,18 @@ async function tdnetUpdate() {
     const date = (item.pubdate || "").slice(0, 10);
     if (!date) continue;
     const m = title.match(/(\d{4})年(\d{1,2})月期(?:\s*第([1-3])四半期)?/);
-    const fy = m ? Number(m[1]) : null;
-    const q = m ? (m[3] ? Number(m[3]) : 4) : null;
-    const id = `s_${code}_${date}`;
-    let row = scheduleRowById(id);
-    if (!row) {
-      row = {
-        id, code, name: item.company_name || code, date,
-        sector: "", market: "", marketCap: null,
-        fiscalYear: fy, quarter: q,
-        announced: true, checked: false,
-        tanshinUrl: null, setsumeiUrl: null,
-        tanshinStatus: "unpublished", setsumeiStatus: "unpublished",
-        source: "tdnet",
-      };
-      state.schedule.push(row);
-      added++;
-    } else {
-      row.announced = true;
-      updated++;
-    }
-    if (fy) { row.fiscalYear ??= fy; row.quarter ??= q; }
     const docUrl = item.document_url || item.url || null;
-    if (isTanshin && docUrl) {
-      row.tanshinUrl = docUrl;
-      if (row.tanshinStatus === "unpublished" || row.tanshinStatus === "none") row.tanshinStatus = "none";
-    }
-    if (isSetsumei && docUrl) {
-      row.setsumeiUrl = docUrl;
-      if (row.setsumeiStatus === "unpublished") row.setsumeiStatus = "none";
-    }
+    const { added: isNew } = mergeScheduleRow({
+      code, date,
+      name: item.company_name || code,
+      fiscalYear: m ? Number(m[1]) : null,
+      quarter: m ? (m[3] ? Number(m[3]) : 4) : null,
+      announced: true,
+      tanshinUrl: isTanshin ? docUrl : null,
+      setsumeiUrl: isSetsumei ? docUrl : null,
+      source: "tdnet",
+    });
+    if (isNew) added++; else updated++;
   }
   saveState();
   render();
@@ -1664,8 +1783,16 @@ async function fetchSchedulePdf(row, silent = false) {
     saveState();
     render();
     try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // 直接fetch(CORS許可があるホストのみ成功)→失敗したらローカルヘルパー経由
+      let res;
+      try {
+        res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      } catch (directErr) {
+        if (!helperBase()) throw directErr;
+        res = await fetch(`${helperBase()}/pdf?url=${encodeURIComponent(url)}`);
+        if (!res.ok) throw new Error(`helper HTTP ${res.status}`);
+      }
       const blob = await res.blob();
       const file = new File([blob], url.split("/").pop() || `${row.code}_${docType}.pdf`, { type: "application/pdf" });
       row[statusKey] = "done";
@@ -1916,7 +2043,15 @@ function openSettingsModal() {
           </select>
         </div>
         <div class="field span2">
-          <label>スケジュールAPI ベースURL(TDnet互換)</label>
+          <label>ローカルヘルパーURL(tools/kessan_helper.py)</label>
+          <input id="setting-helper" value="${esc(state.settings.helperBase || "")}">
+          <span class="toolbar-note">スケジュール取得・株探/TDnetからのPDF取得に使用。<code>python3 tools/kessan_helper.py</code> で起動
+            <button class="ghost" id="setting-helper-check" type="button">接続確認</button>
+            <span id="helper-check-result"></span>
+          </span>
+        </div>
+        <div class="field span2">
+          <label>スケジュールAPI ベースURL(TDnet互換、ヘルパー不使用時の直接取得)</label>
           <input id="setting-api" value="${esc(state.settings.scheduleApiBase || "")}">
         </div>
       </div>
@@ -1954,6 +2089,20 @@ function openSettingsModal() {
   document.getElementById("setting-api").addEventListener("change", (e) => {
     state.settings.scheduleApiBase = e.target.value.trim();
     saveState();
+  });
+  document.getElementById("setting-helper").addEventListener("change", (e) => {
+    state.settings.helperBase = e.target.value.trim();
+    saveState();
+  });
+  document.getElementById("setting-helper-check").addEventListener("click", async () => {
+    const out = document.getElementById("helper-check-result");
+    out.textContent = "確認中…";
+    try {
+      const data = await helperJson("/status");
+      out.textContent = data.ok ? "✅ 接続OK" : "応答が不正です";
+    } catch (err) {
+      out.textContent = `❌ 接続不可(${err.message})`;
+    }
   });
   document.getElementById("import-file").addEventListener("change", handleImport);
 }
@@ -2059,9 +2208,22 @@ document.addEventListener("click", (e) => {
     case "upload-any":
       openUploadAny();
       break;
+    case "schedule-update":
+      scheduleUpdate();
+      break;
     case "tdnet-update":
       tdnetUpdate();
       break;
+    case "kabutan-pdf": {
+      const row = scheduleRowById(id);
+      if (row) openKabutanModal(row.code, { scheduleRow: row });
+      break;
+    }
+    case "kabutan-company": {
+      const c = companyById(id);
+      if (c) openKabutanModal(c.code, { companyId: c.id });
+      break;
+    }
     case "schedule-import":
       openScheduleImportModal();
       break;

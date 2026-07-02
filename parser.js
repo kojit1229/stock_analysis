@@ -108,7 +108,16 @@ function detectMeta(pages) {
       meta.fiscalYearEnd = Number(title[2]);
       meta.quarter = title[3] ? Number(title[3]) : 4;
     }
-    if (/決算説明|決算補足|決算プレゼン/.test(t) && meta.docType === "unknown") meta.docType = "setsumei";
+    if (/決算説明|決算補足|決算プレゼン/.test(t) && meta.docType === "unknown") {
+      meta.docType = "setsumei";
+      // 説明資料の表題から期を推定("2027年3月期 第1四半期 決算説明資料"等)
+      const pm = t.match(/(\d{4})\s*年\s*(\d{1,2})\s*月期(?:\s*第\s*([1-3])\s*四半期)?/);
+      if (pm && meta.fiscalYear === null) {
+        meta.fiscalYear = Number(pm[1]);
+        meta.fiscalYearEnd = Number(pm[2]);
+        meta.quarter = pm[3] ? Number(pm[3]) : 4;
+      }
+    }
     const code = t.match(/コード番号[^\d]*(\d{4}[0-9A-Z]?)/);
     if (code) meta.code = code[1];
     const name = t.match(/上場会社名\s*(.+?)(?:\s+上場取引所|$)/);
