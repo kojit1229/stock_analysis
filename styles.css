@@ -1,0 +1,342 @@
+/* Kessan Board — iPad横持ち第一(Q8-A)、ダークモード標準 */
+
+:root {
+  --bg: #12151c;
+  --bg-panel: #1a1f2a;
+  --bg-panel-2: #222836;
+  --border: #303848;
+  --text: #e4e8f0;
+  --text-dim: #8b93a6;
+  --accent: #4d9fff;
+  --pos: #2eb872;
+  --neg: #e05252;
+  --warn: #e0a52e;
+  --heat-pos-1: rgba(46, 184, 114, 0.15);
+  --heat-pos-2: rgba(46, 184, 114, 0.3);
+  --heat-pos-3: rgba(46, 184, 114, 0.45);
+  --heat-neg-1: rgba(224, 82, 82, 0.15);
+  --heat-neg-2: rgba(224, 82, 82, 0.3);
+  --heat-neg-3: rgba(224, 82, 82, 0.45);
+}
+
+html[data-theme="light"] {
+  --bg: #f4f6fa;
+  --bg-panel: #ffffff;
+  --bg-panel-2: #eef1f6;
+  --border: #d4dae4;
+  --text: #1d2430;
+  --text-dim: #66707f;
+  --accent: #1d6fd6;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px 48px;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+button:hover { border-color: var(--accent); }
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+button.danger { color: var(--neg); border-color: var(--neg); }
+
+button.ghost { background: transparent; border-color: transparent; }
+
+input, select, textarea {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  width: 100%;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ---- topbar ---- */
+
+#topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 0;
+  flex-wrap: wrap;
+}
+
+#topbar h1 {
+  font-size: 20px;
+  margin: 0;
+  margin-right: auto;
+  white-space: nowrap;
+}
+
+#topbar .back { font-size: 17px; }
+
+#topbar input[type="search"] { width: 180px; }
+
+#topbar select { width: auto; }
+
+.company-title { display: flex; align-items: baseline; gap: 10px; margin-right: auto; flex-wrap: wrap; }
+.company-title .code { color: var(--text-dim); }
+.company-title h1 { margin-right: 0; }
+.company-title .meta { color: var(--text-dim); font-size: 13px; }
+
+.tag {
+  display: inline-block;
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+/* ---- 入力待ちバナー ---- */
+
+.pending-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warn);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  font-size: 14px;
+}
+
+.pending-banner button {
+  padding: 3px 10px;
+  font-size: 13px;
+}
+
+/* ---- テーブル共通 ---- */
+
+.table-wrap {
+  overflow-x: auto;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+th, td {
+  padding: 9px 12px;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+
+th {
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  background: var(--bg-panel);
+}
+
+th:first-child, td:first-child { text-align: left; }
+
+tbody tr:last-child td { border-bottom: none; }
+
+tbody tr.clickable { cursor: pointer; }
+tbody tr.clickable:hover td { background: var(--bg-panel-2); }
+
+td.heat-pos-1 { background: var(--heat-pos-1); }
+td.heat-pos-2 { background: var(--heat-pos-2); }
+td.heat-pos-3 { background: var(--heat-pos-3); }
+td.heat-neg-1 { background: var(--heat-neg-1); }
+td.heat-neg-2 { background: var(--heat-neg-2); }
+td.heat-neg-3 { background: var(--heat-neg-3); }
+
+.empty-state {
+  text-align: center;
+  color: var(--text-dim);
+  padding: 60px 20px;
+}
+
+/* ---- 銘柄詳細ダッシュボード: iPad横持ち2カラム ---- */
+
+.dashboard {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .dashboard { grid-template-columns: 1fr; }
+}
+
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 600px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.kpi-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.kpi-card .kpi-label { font-size: 12px; color: var(--text-dim); }
+.kpi-card .kpi-value { font-size: 22px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.kpi-card .kpi-sub { font-size: 13px; margin-top: 2px; }
+.kpi-card .kpi-unit { font-size: 12px; color: var(--text-dim); font-weight: 400; }
+
+.up { color: var(--pos); }
+.down { color: var(--neg); }
+.dim { color: var(--text-dim); }
+
+.chart-box { position: relative; height: 260px; }
+.chart-box + .chart-box { margin-top: 18px; }
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.panel-head h2 { font-size: 14px; margin: 0; margin-right: auto; color: var(--text-dim); font-weight: 600; }
+
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.seg button {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 4px 10px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.seg button.active { background: var(--accent); color: #fff; }
+
+/* ---- モーダル ---- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 4vh 16px;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.modal {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 640px;
+  padding: 20px;
+}
+
+.modal h2 { margin: 0 0 16px; font-size: 17px; }
+
+.modal .modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.modal .modal-actions .spacer { margin-right: auto; }
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 540px) {
+  .form-grid { grid-template-columns: 1fr; }
+}
+
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field.span2 { grid-column: span 2; }
+@media (max-width: 540px) { .field.span2 { grid-column: span 1; } }
+.field label { font-size: 12px; color: var(--text-dim); }
+.field .prev-value { font-size: 12px; color: var(--text-dim); min-height: 15px; font-variant-numeric: tabular-nums; }
+.field input.attention { border-color: var(--warn); background: rgba(224, 165, 46, 0.08); }
+.field .attention-note { color: var(--warn); font-size: 12px; }
+
+.form-section {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+  margin-top: 6px;
+}
+
+.check-row { display: flex; align-items: center; gap: 8px; }
+.check-row input[type="checkbox"] { width: auto; }
+
+.settings-block { margin-bottom: 20px; }
+.settings-block h3 { font-size: 14px; margin: 0 0 8px; }
+.settings-block p { font-size: 13px; color: var(--text-dim); margin: 4px 0 10px; }
+
+.toolbar-note { font-size: 12px; color: var(--text-dim); }
