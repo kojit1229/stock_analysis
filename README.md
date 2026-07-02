@@ -22,17 +22,27 @@ python3 -m http.server 8000
 ES Modules を使用しているため `file://` 直接オープンでは動きません。
 GitHub Pages などの静的ホスティングにそのまま置けます。
 
-### ローカルヘルパー(スケジュール取得・株探/TDnetからのPDF取得に必要)
+### ヘルパー(スケジュール取得・株探/TDnetからのPDF取得に必要)
 
 静的アプリのため、TDnet・株探(kabutan.jp)等からの直接取得はブラウザのCORS制約で失敗します。
-**PC上でヘルパーを起動しておくと**、スケジュール更新(過去=TDnet、未来=JPX発表予定)・
-株探の開示一覧からのPDF取込・PDF一括取得がすべて動きます:
+ヘルパーを経由すると、スケジュール更新(過去=TDnet、未来=JPX発表予定)・
+株探の開示一覧からのPDF取込・PDF一括取得がすべて動きます。**使う端末に応じて2種類**あります:
+
+**iPhone / iPad から使う場合(推奨: クラウド版)** — 無料のCloudflare Workerを1回デプロイ:
+
+1. [dash.cloudflare.com](https://dash.cloudflare.com) で無料アカウント作成
+2. Workers & Pages → Create → Worker → Deploy → 「Edit code」
+3. [`tools/kessan-helper-worker.js`](tools/kessan-helper-worker.js) の内容を全部貼り付けて Deploy
+4. 発行URL(`https://〜.workers.dev`)をアプリの設定画面「ヘルパーURL」に貼り、「接続確認」で✅を確認
+
+**PCから使う場合(ローカル版)**:
 
 ```sh
 python3 tools/kessan_helper.py   # http://localhost:8787(標準ライブラリのみ、依存なし)
 ```
 
-- アプリの設定画面「ローカルヘルパーURL」で接続確認できます
+※ `localhost` はアプリを開いている端末自身を指すため、iPhone/iPadからは使えません。
+
 - ヘルパーなしでも全機能は動作します(スケジュールはCSV/手動追加、PDFは手動アップロード)
 - 銘柄詳細の「株探PDF」ボタン、またはスケジュール各行の「株探」ボタンから、
   株探に上がっている決算短信・説明資料PDFを選んで取り込めます

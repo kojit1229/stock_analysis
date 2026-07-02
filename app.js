@@ -1648,10 +1648,19 @@ async function scheduleUpdate() {
     const errNote = data.errors?.length ? `\n一部失敗: ${data.errors.join(" / ")}` : "";
     alert(`ヘルパー経由で更新しました: 追加 ${added}件 / 合計 ${state.schedule.length}件${errNote}`);
   } catch (err) {
+    const isLocalhostHelper = /\/\/localhost|\/\/127\.0\.0\.1/.test(helperBase());
+    const hint = isLocalhostHelper
+      ? "このURL(localhost)は「アプリを開いている端末自身」を指します。\n" +
+        "・PCで使う場合: 同じPCで python3 tools/kessan_helper.py を起動\n" +
+        "・iPhone/iPadで使う場合: クラウド版ヘルパー(無料のCloudflare Worker)を\n" +
+        "  デプロイし、そのURL(https://〜.workers.dev)を設定画面の\n" +
+        "  「ヘルパーURL」に貼ってください。手順: tools/kessan-helper-worker.js の冒頭\n"
+      : "設定画面の「接続確認」でヘルパーの稼働を確認してください。\n";
     const direct = confirm(
-      `ローカルヘルパー(${helperBase() || "未設定"})に接続できません: ${err.message}\n\n` +
-      "ヘルパーを使うと株探・TDnet・JPXから取得できます:\n  python3 tools/kessan_helper.py\n\n" +
-      "OK: TDnet APIへの直接アクセスを試す / キャンセル: 中止"
+      `ヘルパー(${helperBase() || "未設定"})に接続できません: ${err.message}\n\n` +
+      hint + "\n" +
+      "OK: TDnet APIへの直接アクセスを試す(ブラウザ制約で失敗する場合があります)\n" +
+      "キャンセル: 中止(CSVインポート・手動追加は引き続き使えます)"
     );
     if (direct) await tdnetUpdate();
   }
@@ -2043,9 +2052,11 @@ function openSettingsModal() {
           </select>
         </div>
         <div class="field span2">
-          <label>ローカルヘルパーURL(tools/kessan_helper.py)</label>
-          <input id="setting-helper" value="${esc(state.settings.helperBase || "")}">
-          <span class="toolbar-note">スケジュール取得・株探/TDnetからのPDF取得に使用。<code>python3 tools/kessan_helper.py</code> で起動
+          <label>ヘルパーURL(スケジュール取得・株探/TDnetからのPDF取得に使用)</label>
+          <input id="setting-helper" value="${esc(state.settings.helperBase || "")}" placeholder="https://kessan-helper.xxxx.workers.dev">
+          <span class="toolbar-note">
+            PC: <code>python3 tools/kessan_helper.py</code>(http://localhost:8787)/
+            iPhone・iPad: クラウド版(tools/kessan-helper-worker.js をCloudflare Workersにデプロイし、そのURLをここに貼る)
             <button class="ghost" id="setting-helper-check" type="button">接続確認</button>
             <span id="helper-check-result"></span>
           </span>
