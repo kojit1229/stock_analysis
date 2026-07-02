@@ -340,3 +340,159 @@ td.heat-neg-3 { background: var(--heat-neg-3); }
 .settings-block p { font-size: 13px; color: var(--text-dim); margin: 4px 0 10px; }
 
 .toolbar-note { font-size: 12px; color: var(--text-dim); }
+
+/* ---- v2: グローバルナビ ---- */
+
+#nav {
+  display: flex;
+  gap: 4px;
+  padding-top: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 8px 14px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.nav-tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+/* ---- v2: 分析メイン ---- */
+
+.info-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 14px;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+
+.info-bar b { color: var(--text-dim); font-weight: 600; margin-right: 4px; font-size: 12px; }
+.info-bar .spacer { margin-left: auto; }
+.info-bar select { width: auto; padding: 4px 8px; font-size: 13px; }
+
+.kpi-grid-8 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 900px) { .kpi-grid-8 { grid-template-columns: repeat(2, 1fr); } }
+
+.kpi-card .kpi-sub { min-height: 17px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+.chart-tall { height: 340px; }
+
+tr.current-row td { background: rgba(77, 159, 255, 0.08); }
+td.cell-left { text-align: left; }
+td.cell-actions { text-align: left; white-space: nowrap; }
+td.cell-actions button { padding: 3px 10px; font-size: 12px; }
+.open-link { color: var(--accent); font-size: 12px; margin-left: 6px; }
+
+.pdf-attach-btn {
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.pdf-attach-btn:hover { border-color: var(--accent); }
+
+/* ---- v2: コメント・株価パネル ---- */
+
+.comment-panel { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; }
+.comment-panel h2 { font-size: 14px; color: var(--text-dim); margin: 0 0 10px; }
+
+.valuation {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: var(--bg-panel-2);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-top: 12px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.valuation b { color: var(--text-dim); font-weight: 600; margin-right: 4px; font-size: 12px; }
+
+/* ---- v2: スケジュール ---- */
+
+.filter-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-bar input[type="search"] { width: 220px; }
+.filter-bar select { width: auto; }
+
+.schedule-table th, .schedule-table td { padding: 7px 8px; font-size: 13px; }
+
+.status {
+  display: inline-block;
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 9px;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.status-done { color: var(--pos); border-color: var(--pos); }
+.status-failed { color: var(--neg); border-color: var(--neg); }
+.status-fetching, .status-pending { color: var(--warn); border-color: var(--warn); }
+
+/* ---- v2: PDF抽出ロック / セグメント行 ---- */
+
+.lock-mark { font-size: 11px; color: var(--warn); }
+.field input[readonly][data-locked="1"] { opacity: 0.75; background: var(--bg-panel); }
+.field input.unlocked { opacity: 1; border-color: var(--warn); }
+
+.segment-row { display: flex; gap: 8px; margin-bottom: 6px; }
+.segment-row .seg-name { flex: 2; }
+.segment-row .seg-sales, .segment-row .seg-profit { flex: 1; }
+.segment-row .seg-del { flex: 0 0 auto; }
+
+.modal-wide { max-width: 860px; }
+
+/* ---- v2: PDFビューア ---- */
+
+.pdf-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+
+.pdf-toolbar button { padding: 4px 10px; }
+.pdf-pageinfo { font-size: 13px; color: var(--text-dim); white-space: nowrap; }
+.pdf-pageinput { width: 60px; padding: 4px 6px; text-align: right; }
+.pdf-search { width: 160px; }
+.pdf-toolbar select { width: auto; padding: 4px 8px; font-size: 13px; }
+
+.pdf-canvas-wrap {
+  overflow: auto;
+  max-height: 70vh;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #555;
+  text-align: center;
+}
+
+.pdf-canvas-wrap canvas { margin: 8px auto; box-shadow: 0 2px 12px rgba(0,0,0,0.4); }
+.pdf-status { font-size: 12px; color: var(--text-dim); min-height: 16px; margin-top: 4px; }
