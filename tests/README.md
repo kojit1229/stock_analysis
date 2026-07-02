@@ -24,6 +24,7 @@ KESSAN_KABUTAN_BASE="http://localhost:8788/kabutan/disclosures/?code={code}" \
 python3 tools/kessan_helper.py &                  # :8787 実ヘルパー(モックを向く)
 
 node tests/e2e-helper.mjs       # スケジュール取得/株探取込/CORSフォールバック
+node tests/worker-test.mjs      # クラウド版ヘルパー(Cloudflare Worker)のロジック検証
 ```
 
 `--- ALL PASSED ---` が出れば成功。
