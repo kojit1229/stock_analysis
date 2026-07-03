@@ -1,1 +1,5 @@
 node_modules/
+__pycache__/
+.pytest_cache/
+kessan-app/cache/
+kessan-app/downloads/

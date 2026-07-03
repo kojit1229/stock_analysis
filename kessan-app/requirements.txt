@@ -1,0 +1,6 @@
+streamlit
+pandas
+pyarrow
+requests
+yfinance
+xlrd        # JPX上場銘柄一覧 data_j.xls(市場区分・33業種の補完)のパース
